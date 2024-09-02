@@ -59,7 +59,7 @@ const std::wstring GetAppSettingsFilePath(const std::wstring& strFilePath, const
 	return lpszFullPath;
 }
 
-bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDownloadURL)
+bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDownloadURL, fnCallback ParentCallback)
 {
 	bool retVal = false;
 	CVersionInfo pVersionInfo;
@@ -67,7 +67,6 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 	if (pVersionInfo.Load(strFilePath.c_str()))
 	{
 		const std::wstring& strProductName = pVersionInfo.GetProductName();
-		OutputDebugString(strProductName.c_str());
 		try {
 			const HRESULT hr{ CoInitialize(nullptr) };
 			if (FAILED(hr))
@@ -83,13 +82,13 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 			const int nErrorLength = 0x100;
 			TCHAR lpszErrorMessage[nErrorLength] = { 0, };
 			pException.GetErrorMessage(lpszErrorMessage, nErrorLength);
-			OutputDebugString(lpszErrorMessage);
+			ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
 		}
 	}
 	return retVal;
 }
 
-bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL)
+bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, fnCallback ParentCallback)
 {
 	HRESULT hResult = S_OK;
 	bool retVal = false;
@@ -103,7 +102,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 		{
 			CString strFileName = lpszFilePath;
 			strFileName.Replace(_T(".tmp"), _T(".xml"));
-			OutputDebugString(_T("Connecting..."));
+			ParentCallback(GENUP4WIN_INPROGRESS, _T("Connecting..."));
 			if ((hResult = URLDownloadToFile(nullptr, strConfigURL.c_str(), strFileName, 0, nullptr)) == S_OK)
 			{
 				try {
@@ -121,21 +120,21 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 					const int nErrorLength = 0x100;
 					TCHAR lpszErrorMessage[nErrorLength] = { 0, };
 					pException.GetErrorMessage(lpszErrorMessage, nErrorLength);
-					OutputDebugString(lpszErrorMessage);
+					ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
 				}
 			}
 			else
 			{
 				_com_error pError(hResult);
 				LPCTSTR lpszErrorMessage = pError.ErrorMessage();
-				OutputDebugString(lpszErrorMessage);
+				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
 			}
 		}
 	}
 	return retVal;
 }
 
-bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strConfigURL)
+bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strConfigURL, fnCallback ParentCallback)
 {
 	HRESULT hResult = S_OK;
 	bool retVal = false;
@@ -146,7 +145,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 	{
 		const std::wstring& strProductName = pVersionInfo.GetProductName();
 		OutputDebugString(strProductName.c_str());
-		if (ReadConfigFile(strConfigURL, strProductName, strLatestVersion, strDownloadURL))
+		if (ReadConfigFile(strConfigURL, strProductName, strLatestVersion, strDownloadURL, ParentCallback))
 		{
 			bool bNewUpdateFound = (strLatestVersion.compare(pVersionInfo.GetProductVersionAsString()) != 0);
 			if (bNewUpdateFound)
@@ -161,7 +160,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 					{
 						CString strFileName = lpszFilePath;
 						strFileName.Replace(_T(".tmp"), DEFAULT_EXTENSION);
-						OutputDebugString(_T("Downloading..."));
+						ParentCallback(GENUP4WIN_INPROGRESS, _T("Downloading..."));
 						if ((hResult = URLDownloadToFile(nullptr, strDownloadURL.c_str(), strFileName, 0, nullptr)) == S_OK)
 						{
 							SHELLEXECUTEINFO pShellExecuteInfo;
@@ -174,20 +173,19 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 							pShellExecuteInfo.lpDirectory = nullptr;
 							pShellExecuteInfo.nShow = SW_SHOWNORMAL;
 							const bool bLauched = ShellExecuteEx(&pShellExecuteInfo);
-							OutputDebugString(bLauched ? _T("The installation started successfully") : _T("Installation failed"));
+							ParentCallback(GENUP4WIN_INPROGRESS, bLauched ? _T("The installation started successfully") : _T("Installation failed"));
 							retVal = true; // Download was successful
 						}
 						else
 						{
 							_com_error pError(hResult);
 							LPCTSTR lpszErrorMessage = pError.ErrorMessage();
-							OutputDebugString(lpszErrorMessage);
+							ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
 						}
 					}
 				}
 			}
 		}
 	}
-
 	return retVal;
 }

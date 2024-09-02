@@ -24,6 +24,7 @@ SOFTWARE. */
 #ifdef __cplusplus
 
 #include <string>
+#include <functional>
 
 #ifdef GENUP4WIN_EXPORTS
 #define GENUP4WIN __declspec(dllexport)
@@ -31,16 +32,26 @@ SOFTWARE. */
 #define GENUP4WIN __declspec(dllimport)
 #endif
 
+typedef enum {
+	GENUP4WIN_ERROR = -1,
+	GENUP4WIN_OK,
+	GENUP4WIN_INPROGRESS
+} GENUP4WIN_STATUS;
+
+void StatusCallback(int, const std::wstring& strMessage) { OutputDebugString(strMessage.c_str()); };
+
+typedef std::function<void(int, const std::wstring& strMessage)> fnCallback;
+
 // Generates the configuration XML file path
 GENUP4WIN const std::wstring GetAppSettingsFilePath(const std::wstring& strFilePath, const std::wstring& strProductName);
 
 // Writes the configuration XML file; the result should be install on Web for futher access
-GENUP4WIN bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDownloadURL);
+GENUP4WIN bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDownloadURL, fnCallback = StatusCallback);
 
 // Reads the config XML file (i.e. downloads it on local machine); the result is stored in `strLatestVersion` and `strDownloadURL`
-GENUP4WIN bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL);
+GENUP4WIN bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, fnCallback = StatusCallback);
 
 // Checks for updates; first, it downloads the config XML file; then, it actual downloads the installer
-GENUP4WIN bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strConfigURL);
+GENUP4WIN bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strConfigURL, fnCallback = StatusCallback);
 
 #endif

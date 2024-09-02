@@ -53,6 +53,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    const DWORD nLength = _MAX_PATH;
+    TCHAR lpszFilePath[nLength] = { 0, };
+    GetModuleFileName(nullptr, lpszFilePath, nLength);
+    WriteConfigFile(lpszFilePath, _T("https://www.moga.doctor/freeware/IntelliEditSetup.msi"));
+
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_DEMOAPP, szWindowClass, MAX_LOADSTRING);
@@ -243,6 +248,13 @@ INT_PTR CALLBACK AboutCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     return (INT_PTR)FALSE;
 }
 
+HWND hwndDialog = nullptr;
+void UI_Callback(int, const std::wstring& strMessage)
+{
+    SetWindowText(GetDlgItem(hwndDialog, IDC_STATUS), strMessage.c_str());
+    UpdateWindow(GetDlgItem(hwndDialog, IDC_STATUS));
+}
+
 bool g_bThreadRunning = false;
 bool g_bNewUpdateFound = false;
 DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
@@ -253,8 +265,7 @@ DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
     const DWORD nLength = _MAX_PATH;
     TCHAR lpszFilePath[nLength] = { 0, };
     GetModuleFileName(nullptr, lpszFilePath, nLength);
-    // WriteConfigFile(lpszFilePath, _T("https://www.moga.doctor/freeware/IntelliEditSetup.msi"));
-    g_bNewUpdateFound = CheckForUpdates(lpszFilePath, _T("https://www.moga.doctor/freeware/genUp4win.xml"));
+    g_bNewUpdateFound = CheckForUpdates(lpszFilePath, _T("https://www.moga.doctor/freeware/genUp4win.xml"), UI_Callback);
     g_bThreadRunning = false;
 
     ::ExitThread(0);
@@ -271,8 +282,9 @@ INT_PTR CALLBACK UpdateCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
     switch (message)
     {
         case WM_INITDIALOG:
+            hwndDialog = hDlg; // used in UI_Callback
             CenterWindow(hDlg);
-            SendMessage(GetDlgItem(hDlg, IDC_PROGRESS), (UINT)PBM_SETMARQUEE, (WPARAM)TRUE, (LPARAM)30);
+            // SendMessage(GetDlgItem(hDlg, IDC_PROGRESS), (UINT)PBM_SETMARQUEE, (WPARAM)TRUE, (LPARAM)30);
             m_hUpdateThread = ::CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)UpdateThreadProc, hDlg, 0, &m_nUpdateThreadID);
             m_nTimerID = SetTimer(hDlg, 0x1234, 100, nullptr);
             return (INT_PTR)TRUE;
