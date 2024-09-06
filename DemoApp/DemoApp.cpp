@@ -58,6 +58,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     GetModuleFileName(nullptr, lpszFilePath, nLength);
     WriteConfigFile(lpszFilePath, _T("https://www.moga.doctor/freeware/IntelliEditSetup.msi"));
 
+    // TODO: Please upload the configuration file to your Web Server.
+
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_DEMOAPP, szWindowClass, MAX_LOADSTRING);
