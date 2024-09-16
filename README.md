@@ -1,5 +1,3 @@
-# genUp4win
-
 ## What is genUp4win?
 *genUp4win* is a Generic Updater running under Microsoft Windows environment. The aim of *genUp4win* is to provide a ready to use and configurable updater which downloads a update package then installs it. By using `URLDownloadToFile` function and PJ Naughter's `AppSettings` library, *genUp4win* is capable to deal with **https protocol** and process **XML** data.
 
@@ -26,7 +24,7 @@ GetModuleFileName(nullptr, lpszFilePath, nLength);
 WriteConfigFile(lpszFilePath, MSI_OR_EXE_INSTALLATION_FILE);
 ```
 
-Please upload the configuration file to your Web Server.
+**Please upload the configuration file to your Web Server.**
 
 Third step is to check for updates, using the `CheckForUpdates` function.
 
@@ -53,6 +51,6 @@ Web Server ->> PC(Client): Download Installation file
 Being MIT licensed, *genUp4win* can be integrated in both commercial (or close source) and open source project. So if you run a commercial or open a source project under Microsoft Windows and you release your program at regular intervals, then you may need *genUp4win* to notice your users the new update.
 
 ## To whom should you say "thank you"?
-stefan-mihai@moga.doctor
+stefan-mihai[at]moga[dot]doctor
 
-Contributions are welcome. Be mindful of our [Contribution Rules](CONTRIBUTING.md) to increase the likelihood of your contribution getting accepted.
+Contributions are welcome. Be mindful of our [Contribution Rules](https://github.com/mihaimoga/genUp4win/blob/main/CONTRIBUTING.md) to increase the likelihood of your contribution getting accepted.
