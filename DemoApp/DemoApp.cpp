@@ -53,7 +53,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    const DWORD nLength = _MAX_PATH;
+    const DWORD nLength = 0x1000 /* _MAX_PATH */;
     TCHAR lpszFilePath[nLength] = { 0, };
     GetModuleFileName(nullptr, lpszFilePath, nLength);
     WriteConfigFile(lpszFilePath, _T("https://www.moga.doctor/freeware/IntelliEditSetup.msi"));
@@ -264,14 +264,14 @@ DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
     UNREFERENCED_PARAMETER(lpParam);
 
     g_bThreadRunning = true;
-    const DWORD nLength = _MAX_PATH;
+    const DWORD nLength = 0x1000 /* _MAX_PATH */;
     TCHAR lpszFilePath[nLength] = { 0, };
     GetModuleFileName(nullptr, lpszFilePath, nLength);
     g_bNewUpdateFound = CheckForUpdates(lpszFilePath, _T("https://www.moga.doctor/freeware/genUp4win.xml"), UI_Callback);
     g_bThreadRunning = false;
 
     ::ExitThread(0);
-    return 0;
+    // return 0;
 }
 
 DWORD m_nUpdateThreadID = 0;

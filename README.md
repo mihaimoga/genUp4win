@@ -18,7 +18,7 @@ Second step is to generate the configuration file, using the `WriteConfigFile` f
 
 The C++ code to generate the configuration file is:
 ```cpp
-const DWORD nLength = _MAX_PATH;
+const DWORD nLength = 0x1000 /* _MAX_PATH */;
 TCHAR lpszFilePath[nLength] = { 0, };
 GetModuleFileName(nullptr, lpszFilePath, nLength);
 WriteConfigFile(lpszFilePath, MSI_OR_EXE_INSTALLATION_FILE);
@@ -30,7 +30,7 @@ Third step is to check for updates, using the `CheckForUpdates` function.
 
 The C++ code to check for updates is:
 ```cpp
-const DWORD nLength = _MAX_PATH;
+const DWORD nLength = 0x1000 /* _MAX_PATH */;
 TCHAR lpszFilePath[nLength] = { 0, };
 GetModuleFileName(nullptr, lpszFilePath, nLength);
 g_bNewUpdateFound = CheckForUpdates(lpszFilePath, XML_CONFIGURATION_FILE);
