@@ -103,7 +103,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 	if (nLength > 0)
 	{
 		TCHAR lpszFilePath[_MAX_PATH + 1] = { 0, };
-		nLength = GetTempFileName(lpszTempPath, nullptr, 0, lpszFilePath);
+		nLength = GetTempFileName(lpszTempPath, L"GUP", 0, lpszFilePath);
 		if (nLength > 0)
 		{
 			CString strFileName = lpszFilePath;
@@ -175,7 +175,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 				if (nLength > 0)
 				{
 					TCHAR lpszFilePath[_MAX_PATH + 1] = { 0, };
-					nLength = GetTempFileName(lpszTempPath, nullptr, 0, lpszFilePath);
+					nLength = GetTempFileName(lpszTempPath, L"GUP", 0, lpszFilePath);
 					if (nLength > 0)
 					{
 						CString strFileName = lpszFilePath;
