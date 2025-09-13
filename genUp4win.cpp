@@ -34,6 +34,14 @@ SOFTWARE. */
 
 #include <comdef.h>
 #include <shlobj.h>
+
+/**
+ * @brief Constructs the full path to the application's settings XML file.
+ *        Tries to use the user's profile directory; falls back to the given file path.
+ * @param strFilePath The base file path to use if the profile directory is unavailable.
+ * @param strProductName The product name, used as the XML file name.
+ * @return The full path to the settings XML file.
+ */
 const std::wstring GetAppSettingsFilePath(const std::wstring& strFilePath, const std::wstring& strProductName)
 {
 	WCHAR* lpszSpecialFolderPath = nullptr;
@@ -54,7 +62,14 @@ const std::wstring GetAppSettingsFilePath(const std::wstring& strFilePath, const
 	OutputDebugString(strFullPath.c_str());
 	return strFullPath.c_str();
 }
-/* The WriteConfigFile function writes configuration data to an XML file. */
+
+/**
+ * @brief Writes configuration data (version and download URL) to an XML file.
+ * @param strFilePath Path to the version info file.
+ * @param strDownloadURL The download URL to write.
+ * @param ParentCallback Callback function for status/error reporting.
+ * @return true if the operation succeeded, false otherwise.
+ */
 bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDownloadURL, fnCallback ParentCallback)
 {
 	bool retVal = false;
@@ -74,6 +89,7 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 				return false;
 			}
 
+			// Write version and download URL to XML settings
 			CXMLAppSettings pAppSettings(GetAppSettingsFilePath(strFilePath, strProductName), true, true);
 			pAppSettings.WriteString(strProductName.c_str(), VERSION_ENTRY_ID, pVersionInfo.GetProductVersionAsString().c_str());
 			pAppSettings.WriteString(strProductName.c_str(), DOWNLOAD_ENTRY_ID, strDownloadURL.c_str());
@@ -90,9 +106,16 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 	return retVal;
 }
 
-/* The ReadConfigFile function downloads a configuration file from a specified
-URL, parses it to retrieve the latest version and download URL for a product,
-and invokes a callback function to report the status of the operation. */
+/**
+ * @brief Downloads a configuration XML file from a URL, parses it for the latest version and download URL,
+ *        and reports status via callback.
+ * @param strConfigURL The URL to download the configuration file from.
+ * @param strProductName The product name to look up in the XML.
+ * @param strLatestVersion Output: receives the latest version string.
+ * @param strDownloadURL Output: receives the download URL.
+ * @param ParentCallback Callback function for status/error reporting.
+ * @return true if the operation succeeded, false otherwise.
+ */
 bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, fnCallback ParentCallback)
 {
 	CString strStatusMessage;
@@ -125,6 +148,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 						return false;
 					}
 
+					// Parse XML for version and download URL
 					CXMLAppSettings pAppSettings(std::wstring(strFileName), true, true);
 					strLatestVersion = pAppSettings.GetString(strProductName.c_str(), VERSION_ENTRY_ID);
 					strDownloadURL = pAppSettings.GetString(strProductName.c_str(), DOWNLOAD_ENTRY_ID);
@@ -149,10 +173,14 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 	return retVal;
 }
 
-/* The CheckForUpdates function checks for software updates by comparing the
-current version of a product with the latest version available from a specified
-configuration URL, and it downloads the update if a new version is found,
-utilizing a callback function to report the status of the operation. */
+/**
+ * @brief Checks for software updates by comparing the current version with the latest version from a configuration URL.
+ *        If a new version is found, downloads and launches the update, reporting status via callback.
+ * @param strFilePath Path to the local version info file.
+ * @param strConfigURL URL to the remote configuration XML.
+ * @param ParentCallback Callback function for status/error reporting.
+ * @return true if an update was found and download was successful, false otherwise.
+ */
 bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strConfigURL, fnCallback ParentCallback)
 {
 	CString strStatusMessage;
@@ -186,6 +214,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 						}
 						if ((hResult = URLDownloadToFile(nullptr, strDownloadURL.c_str(), strFileName, 0, nullptr)) == S_OK)
 						{
+							// Launch the downloaded update
 							SHELLEXECUTEINFO pShellExecuteInfo;
 							pShellExecuteInfo.cbSize = sizeof(SHELLEXECUTEINFO);
 							pShellExecuteInfo.fMask = SEE_MASK_FLAG_DDEWAIT | SEE_MASK_NOCLOSEPROCESS | SEE_MASK_DOENVSUBST;

@@ -20,6 +20,15 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. */
 
+/**
+ * @file DemoApp.h
+ * @brief Main header for the DemoApp sample application.
+ *
+ * This header includes resource definitions and ensures single inclusion
+ * for the DemoApp Windows application. All resource IDs and constants
+ * used by the application are defined in the included "resource.h".
+ */
+
 #pragma once
 
-#include "resource.h"
+#include "resource.h" ///< Application resource definitions (icons, dialogs, string IDs, etc.)

@@ -20,8 +20,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. */
 
-// DemoApp.cpp : Defines the entry point for the application.
-//
+/**
+ * @file DemoApp.cpp
+ * @brief Entry point and main logic for the DemoApp Windows application.
+ *        Demonstrates usage of the genUp4win update library.
+ */
 
 #include "pch.h"
 #include "framework.h"
@@ -30,13 +33,26 @@ SOFTWARE. */
 
 #define GENUP4WIN_EXPORTS
 #include "../genUp4win.h"
+#if _WIN64
+#ifdef _DEBUG
+#pragma comment(lib, "../x64/Debug/genUp4win.lib")
+#else
+#pragma comment(lib, "../x64/Release/genUp4win.lib")
+#endif
+#else
+#ifdef _DEBUG
+#pragma comment(lib, "../Debug/genUp4win.lib")
+#else
+#pragma comment(lib, "../Release/genUp4win.lib")
+#endif
+#endif
 
 #define MAX_LOADSTRING 100
 
-// Global Variables:
-HINSTANCE hInst;                                // current instance
-WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
-WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+// Global Variables
+HINSTANCE hInst;                                ///< Current application instance
+WCHAR szTitle[MAX_LOADSTRING];                  ///< The title bar text
+WCHAR szWindowClass[MAX_LOADSTRING];            ///< The main window class name
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -45,6 +61,11 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    AboutCallback(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    UpdateCallback(HWND, UINT, WPARAM, LPARAM);
 
+/**
+ * @brief Retrieves the full path of the current module (executable).
+ * @param pdwLastError Optional pointer to receive the last error code.
+ * @return The full path as a CString, or empty string on failure.
+ */
 CString GetModuleFileName(_Inout_opt_ DWORD* pdwLastError = nullptr)
 {
     CString strModuleFileName;
@@ -75,6 +96,9 @@ CString GetModuleFileName(_Inout_opt_ DWORD* pdwLastError = nullptr)
     }
 }
 
+/**
+ * @brief The main entry point for the application.
+ */
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -83,6 +107,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    // Write a configuration file for the updater (for demonstration)
     CString strFullPath{ GetModuleFileName() };
     WriteConfigFile(strFullPath.GetString(), _T("https://www.moga.doctor/freeware/IntelliEditSetup.msi"));
 
@@ -116,11 +141,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int) msg.wParam;
 }
 
-//
-//  FUNCTION: MyRegisterClass()
-//
-//  PURPOSE: Registers the window class.
-//
+/**
+ * @brief Registers the main window class.
+ * @param hInstance Application instance handle.
+ * @return The atom value for the registered class.
+ */
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
@@ -142,16 +167,12 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     return RegisterClassExW(&wcex);
 }
 
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
+/**
+ * @brief Saves instance handle and creates main window.
+ * @param hInstance Application instance handle.
+ * @param nCmdShow Show command for the window.
+ * @return TRUE if successful, FALSE otherwise.
+ */
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
@@ -170,16 +191,14 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-//
-//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  PURPOSE: Processes messages for the main window.
-//
-//  WM_COMMAND  - process the application menu
-//  WM_PAINT    - Paint the main window
-//  WM_DESTROY  - post a quit message and return
-//
-//
+/**
+ * @brief Processes messages for the main window.
+ * @param hWnd Window handle.
+ * @param message Message identifier.
+ * @param wParam Additional message information.
+ * @param lParam Additional message information.
+ * @return LRESULT result of message processing.
+ */
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
@@ -222,6 +241,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+/**
+ * @brief Centers a window relative to its parent and ensures it stays on screen.
+ * @param hwndWindow Handle to the window to center.
+ * @return TRUE if centered, FALSE otherwise.
+ */
 BOOL CenterWindow(HWND hwndWindow)
 {
     HWND hwndParent;
@@ -256,7 +280,14 @@ BOOL CenterWindow(HWND hwndWindow)
     return FALSE;
 }
 
-// Message handler for about box.
+/**
+ * @brief Message handler for the About dialog box.
+ * @param hDlg Dialog handle.
+ * @param message Message identifier.
+ * @param wParam Additional message information.
+ * @param lParam Additional message information.
+ * @return TRUE if handled, FALSE otherwise.
+ */
 INT_PTR CALLBACK AboutCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     UNREFERENCED_PARAMETER(lParam);
@@ -279,14 +310,27 @@ INT_PTR CALLBACK AboutCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 }
 
 HWND hwndDialog = nullptr;
-void UI_Callback(int, const std::wstring& strMessage)
+
+/**
+ * @brief Callback function for UI updates during update checking.
+ * @param status Status code.
+ * @param strMessage Status message to display.
+ */
+void UI_Callback(int status, const std::wstring& strMessage)
 {
+	UNREFERENCED_PARAMETER(status);
     SetWindowText(GetDlgItem(hwndDialog, IDC_STATUS), strMessage.c_str());
     UpdateWindow(GetDlgItem(hwndDialog, IDC_STATUS));
 }
 
 bool g_bThreadRunning = false;
 bool g_bNewUpdateFound = false;
+
+/**
+ * @brief Thread procedure for checking for updates.
+ * @param lpParam Unused parameter.
+ * @return DWORD exit code.
+ */
 DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
 {
     UNREFERENCED_PARAMETER(lpParam);
@@ -303,7 +347,16 @@ DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
 DWORD m_nUpdateThreadID = 0;
 HANDLE m_hUpdateThread = 0;
 UINT_PTR m_nTimerID = 0;
-// Message handler for Check for updates box.
+
+/**
+ * @brief Message handler for the "Check for updates" dialog box.
+ *        Launches a thread to check for updates and closes the dialog when done.
+ * @param hDlg Dialog handle.
+ * @param message Message identifier.
+ * @param wParam Additional message information.
+ * @param lParam Additional message information.
+ * @return TRUE if handled, FALSE otherwise.
+ */
 INT_PTR CALLBACK UpdateCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     UNREFERENCED_PARAMETER(lParam);
