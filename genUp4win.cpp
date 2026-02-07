@@ -34,6 +34,134 @@ SOFTWARE. */
 
 #include <comdef.h>
 #include <shlobj.h>
+#include "SHA256.h"
+
+/**
+ * @brief Converts a UTF-8 encoded string to a wide string (UTF-16).
+ * @param string The UTF-8 string to convert.
+ * @return The converted wide string.
+ * @throws std::runtime_error if conversion fails.
+ */
+std::wstring utf8_to_wstring(const std::string& string)
+{
+	// Handle empty string case early
+	if (string.empty())
+	{
+		return L"";
+	}
+
+	// Calculate the required buffer size for the wide string
+	const auto size_needed = MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), nullptr, 0);
+	if (size_needed <= 0)
+	{
+		throw std::runtime_error("MultiByteToWideChar() failed: " + std::to_string(size_needed));
+	}
+
+	// Allocate buffer and perform the conversion
+	std::wstring result(size_needed, 0);
+	MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), result.data(), size_needed);
+	return result;
+}
+
+/**
+ * @brief Converts a wide string (UTF-16) to a UTF-8 encoded string.
+ * @param wide_string The wide string to convert.
+ * @return The converted UTF-8 string.
+ * @throws std::runtime_error if conversion fails.
+ */
+std::string wstring_to_utf8(const std::wstring& wide_string)
+{
+	// Handle empty string case early
+	if (wide_string.empty())
+	{
+		return "";
+	}
+
+	// Calculate the required buffer size for the UTF-8 string
+	const auto size_needed = WideCharToMultiByte(CP_UTF8, 0, wide_string.data(), (int)wide_string.size(), nullptr, 0, nullptr, nullptr);
+	if (size_needed <= 0)
+	{
+		throw std::runtime_error("WideCharToMultiByte() failed: " + std::to_string(size_needed));
+	}
+
+	// Allocate buffer and perform the conversion
+	std::string result(size_needed, 0);
+	WideCharToMultiByte(CP_UTF8, 0, wide_string.data(), (int)wide_string.size(), result.data(), size_needed, nullptr, nullptr);
+	return result;
+}
+
+const int MAX_BUFFER = 0x1000; ///< Maximum buffer size for file operations.
+
+/**
+ * @brief Calculates the SHA256 checksum of a file.
+ * @param strFilePath Path to the file to calculate checksum for.
+ * @param strChecksum Output: receives the calculated checksum as a hexadecimal string.
+ * @return true if the checksum was calculated successfully, false if the file couldn't be opened.
+ */
+bool GetChecksumFromFile(const std::wstring strFilePath, std::wstring& strChecksum)
+{
+	SHA256 pSHA256;
+	int nLength = MAX_BUFFER;
+	char pBuffer[MAX_BUFFER] = { 0, };
+
+	// Open the file in binary mode
+	std::ifstream pBinaryFile(strFilePath.c_str(), std::ifstream::binary);
+	if (pBinaryFile.is_open())
+	{
+		// Read the file in chunks and update the SHA256 hash
+		while (!pBinaryFile.eof())
+		{
+			pBinaryFile.read(pBuffer, nLength);
+			if (nLength > 0)
+			{
+				pSHA256.update(reinterpret_cast<const uint8_t*>(pBuffer), static_cast<size_t>(nLength));
+			}
+		}
+		pBinaryFile.close();
+
+		// Convert the digest to a hexadecimal string
+		strChecksum = utf8_to_wstring(SHA256::toString(pSHA256.digest()));
+		return true;
+	}
+	return false;
+}
+
+/**
+ * @brief Downloads a file from a URL and calculates its SHA256 checksum.
+ * @param strURL The URL to download the file from.
+ * @param strChecksum Output: receives the calculated checksum as a hexadecimal string.
+ * @return true if the download and checksum calculation succeeded, false otherwise.
+ */
+bool GetChecksumFromURL(const std::wstring strURL, std::wstring& strChecksum)
+{
+	HRESULT hResult = S_OK;
+	TCHAR lpszTempPath[_MAX_PATH + 1] = { 0, };
+
+	// Get the system's temporary directory path
+	DWORD nLength = GetTempPath(_MAX_PATH, lpszTempPath);
+	if (nLength > 0)
+	{
+		TCHAR lpszFilePath[_MAX_PATH + 1] = { 0, };
+
+		// Generate a unique temporary file name
+		nLength = GetTempFileName(lpszTempPath, L"GUP", 0, lpszFilePath);
+		if (nLength > 0)
+		{
+			// Change the extension from .tmp to .xml
+			CString strFileName = lpszFilePath;
+			strFileName.Replace(_T(".tmp"), _T(".xml"));
+
+			// Download the file from the URL
+			if ((hResult = URLDownloadToFile(nullptr, strURL.c_str(), strFileName, 0, nullptr)) == S_OK)
+			{
+				// Calculate and return the checksum of the downloaded file
+				return GetChecksumFromFile(strFileName.GetString(), strChecksum);
+			}
+		}
+	}
+
+	return false;
+}
 
 /**
  * @brief Constructs the full path to the application's settings XML file.
@@ -45,21 +173,25 @@ SOFTWARE. */
 const std::wstring GetAppSettingsFilePath(const std::wstring& strFilePath, const std::wstring& strProductName)
 {
 	WCHAR* lpszSpecialFolderPath = nullptr;
+
+	// Attempt to get the user's profile directory (e.g., C:\Users\Username)
 	if ((SHGetKnownFolderPath(FOLDERID_Profile, 0, nullptr, &lpszSpecialFolderPath)) == S_OK)
 	{
+		// Build the settings file path in the user's profile directory
 		std::wstring result(lpszSpecialFolderPath);
-		CoTaskMemFree(lpszSpecialFolderPath);
+		CoTaskMemFree(lpszSpecialFolderPath); // Free the allocated memory
 		result += _T("\\");
 		result += strProductName;
 		result += _T(".xml");
-		OutputDebugString(result.c_str());
+		OutputDebugString(result.c_str()); // Log the path for debugging
 		return result;
 	}
 
+	// Fallback: Use the application's directory if profile directory is unavailable
 	std::filesystem::path strFullPath{ strFilePath.c_str() };
 	strFullPath.replace_filename(strProductName);
 	strFullPath.replace_extension(_T(".xml"));
-	OutputDebugString(strFullPath.c_str());
+	OutputDebugString(strFullPath.c_str()); // Log the path for debugging
 	return strFullPath.c_str();
 }
 
@@ -74,29 +206,40 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 {
 	bool retVal = false;
 	CVersionInfo pVersionInfo;
+	std::wstring strChecksum; // Stores the calculated checksum of the download URL
 
+	// Load version information from the specified file
 	if (pVersionInfo.Load(strFilePath.c_str()))
 	{
 		const std::wstring& strProductName = pVersionInfo.GetProductName();
 		try
 		{
+			// Initialize COM library for XML operations
 			const HRESULT hr{ CoInitialize(nullptr) };
 			if (FAILED(hr))
 			{
+				// Report COM initialization failure
 				_com_error pError(hr);
 				LPCTSTR lpszErrorMessage = pError.ErrorMessage();
 				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
 				return false;
 			}
 
-			// Write version and download URL to XML settings
+			// Write version and download URL to XML settings file
 			CXMLAppSettings pAppSettings(GetAppSettingsFilePath(strFilePath, strProductName), true, true);
 			pAppSettings.WriteString(strProductName.c_str(), VERSION_ENTRY_ID, pVersionInfo.GetProductVersionAsString().c_str());
 			pAppSettings.WriteString(strProductName.c_str(), DOWNLOAD_ENTRY_ID, strDownloadURL.c_str());
+
+			// Calculate and write the checksum of the download URL if available
+			if (GetChecksumFromURL(strDownloadURL.c_str(), strChecksum))
+			{
+				pAppSettings.WriteString(strProductName.c_str(), CHECKSUM_ENTRY_ID, strChecksum.c_str());
+			}
 			retVal = true;
 		}
 		catch (CAppSettingsException& pException)
 		{
+			// Handle XML settings exceptions
 			const int nErrorLength = 0x100;
 			TCHAR lpszErrorMessage[nErrorLength] = { 0, };
 			pException.GetErrorMessage(lpszErrorMessage, nErrorLength);
@@ -113,49 +256,63 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
  * @param strProductName The product name to look up in the XML.
  * @param strLatestVersion Output: receives the latest version string.
  * @param strDownloadURL Output: receives the download URL.
+ * @param strChecksum Output: receives the checksum string.
  * @param ParentCallback Callback function for status/error reporting.
  * @return true if the operation succeeded, false otherwise.
  */
-bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, fnCallback ParentCallback)
+bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, std::wstring& strChecksum, fnCallback ParentCallback)
 {
 	CString strStatusMessage;
 	HRESULT hResult = S_OK;
 	bool retVal = false;
 	TCHAR lpszTempPath[_MAX_PATH + 1] = { 0, };
+
+	// Get the system's temporary directory path
 	DWORD nLength = GetTempPath(_MAX_PATH, lpszTempPath);
 	if (nLength > 0)
 	{
 		TCHAR lpszFilePath[_MAX_PATH + 1] = { 0, };
+
+		// Generate a unique temporary file name
 		nLength = GetTempFileName(lpszTempPath, L"GUP", 0, lpszFilePath);
 		if (nLength > 0)
 		{
+			// Change the extension from .tmp to .xml
 			CString strFileName = lpszFilePath;
 			strFileName.Replace(_T(".tmp"), _T(".xml"));
+
+			// Report connection status to the user
 			if (strStatusMessage.LoadString(IDS_CONNECTING))
 			{
 				ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage));
 			}
+
+			// Download the configuration file from the URL
 			if ((hResult = URLDownloadToFile(nullptr, strConfigURL.c_str(), strFileName, 0, nullptr)) == S_OK)
 			{
 				try
 				{
+					// Initialize COM library for XML operations
 					const HRESULT hr{ CoInitialize(nullptr) };
 					if (FAILED(hr))
 					{
+						// Report COM initialization failure
 						_com_error pError(hr);
 						LPCTSTR lpszErrorMessage = pError.ErrorMessage();
 						ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
 						return false;
 					}
 
-					// Parse XML for version and download URL
+					// Parse XML configuration file for version, download URL, and checksum
 					CXMLAppSettings pAppSettings(std::wstring(strFileName), true, true);
 					strLatestVersion = pAppSettings.GetString(strProductName.c_str(), VERSION_ENTRY_ID);
 					strDownloadURL = pAppSettings.GetString(strProductName.c_str(), DOWNLOAD_ENTRY_ID);
+					strChecksum = pAppSettings.GetString(strProductName.c_str(), CHECKSUM_ENTRY_ID);
 					retVal = true;
 				}
 				catch (CAppSettingsException& pException)
 				{
+					// Handle XML parsing exceptions
 					const int nErrorLength = 0x100;
 					TCHAR lpszErrorMessage[nErrorLength] = { 0, };
 					pException.GetErrorMessage(lpszErrorMessage, nErrorLength);
@@ -164,6 +321,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 			}
 			else
 			{
+				// Report download failure
 				_com_error pError(hResult);
 				LPCTSTR lpszErrorMessage = pError.ErrorMessage();
 				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
@@ -187,34 +345,79 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 	HRESULT hResult = S_OK;
 	bool retVal = false;
 	CVersionInfo pVersionInfo;
-	std::wstring strLatestVersion, strDownloadURL;
+	std::wstring strLatestVersion,
+		strDownloadURL,
+		strChecksum;
 
+	// Load the current application's version information
 	if (pVersionInfo.Load(strFilePath.c_str()))
 	{
 		const std::wstring& strProductName = pVersionInfo.GetProductName();
-		OutputDebugString(strProductName.c_str());
-		if (ReadConfigFile(strConfigURL, strProductName, strLatestVersion, strDownloadURL, ParentCallback))
+		OutputDebugString(strProductName.c_str()); // Log product name for debugging
+
+		// Download and parse the remote configuration file
+		if (ReadConfigFile(strConfigURL, strProductName, strLatestVersion, strDownloadURL, strChecksum, ParentCallback))
 		{
+			// Compare current version with the latest version from the server
 			const bool bNewUpdateFound = (strLatestVersion.compare(pVersionInfo.GetProductVersionAsString()) != 0);
 			if (bNewUpdateFound)
 			{
 				TCHAR lpszTempPath[_MAX_PATH + 1] = { 0, };
+
+				// Get the system's temporary directory path
 				DWORD nLength = GetTempPath(_MAX_PATH, lpszTempPath);
 				if (nLength > 0)
 				{
 					TCHAR lpszFilePath[_MAX_PATH + 1] = { 0, };
+
+					// Generate a unique temporary file name
 					nLength = GetTempFileName(lpszTempPath, L"GUP", 0, lpszFilePath);
 					if (nLength > 0)
 					{
+						// Change the extension from .tmp to the default installer extension
 						CString strFileName = lpszFilePath;
 						strFileName.Replace(_T(".tmp"), DEFAULT_EXTENSION);
+
+						// Report download status to the user
 						if (strStatusMessage.LoadString(IDS_DOWNLOADING))
 						{
 							ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage));
 						}
+
+						// Download the update installer
 						if ((hResult = URLDownloadToFile(nullptr, strDownloadURL.c_str(), strFileName, 0, nullptr)) == S_OK)
 						{
-							// Launch the downloaded update
+							// Verify the downloaded file's checksum if available
+							if (!strChecksum.empty())
+							{
+								std::wstring strDownloadedFileChecksum;
+
+								// Calculate the checksum of the downloaded file
+								if (GetChecksumFromFile(strFileName.GetString(), strDownloadedFileChecksum))
+								{
+									// Compare with the expected checksum
+									if (strDownloadedFileChecksum.compare(strChecksum) != 0)
+									{
+										// Checksum mismatch - report error
+										if (strStatusMessage.LoadString(IDS_CHECKSUM_MISMATCH))
+										{
+											ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage));
+										}
+										return false; // Checksum mismatch, do not proceed with the update
+									}
+								}
+								else
+								{
+									// Failed to calculate checksum - report error
+									if (strStatusMessage.LoadString(IDS_CHECKSUM_CALCULATION_FAILED))
+									{
+										ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage));
+									}
+									return false; // Failed to calculate checksum, do not proceed with the update
+								}
+							}
+
+							// Launch the downloaded update installer
 							SHELLEXECUTEINFO pShellExecuteInfo;
 							pShellExecuteInfo.cbSize = sizeof(SHELLEXECUTEINFO);
 							pShellExecuteInfo.fMask = SEE_MASK_FLAG_DDEWAIT | SEE_MASK_NOCLOSEPROCESS | SEE_MASK_DOENVSUBST;
@@ -224,7 +427,11 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 							pShellExecuteInfo.lpParameters = nullptr;
 							pShellExecuteInfo.lpDirectory = nullptr;
 							pShellExecuteInfo.nShow = SW_SHOWNORMAL;
+
+							// Execute the installer
 							const bool bLauched = ShellExecuteEx(&pShellExecuteInfo);
+
+							// Report success or failure status
 							if (strStatusMessage.LoadString(bLauched ? IDS_SUCCESS : IDS_FAILED))
 							{
 								ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage));
@@ -233,6 +440,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 						}
 						else
 						{
+							// Report download failure
 							_com_error pError(hResult);
 							LPCTSTR lpszErrorMessage = pError.ErrorMessage();
 							ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);

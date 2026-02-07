@@ -6,6 +6,8 @@
 #define IDS_DOWNLOADING                 102
 #define IDS_FAILED                      103
 #define IDS_SUCCESS                     104
+#define IDS_CHECKSUM_MISMATCH           105
+#define IDS_CHECKSUM_CALCULATION_FAILED 106
 
 // Next default values for new objects
 // 

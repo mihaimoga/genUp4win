@@ -55,6 +55,7 @@ SOFTWARE. */
 
 #define VERSION_ENTRY_ID _T("Version")
 #define DOWNLOAD_ENTRY_ID _T("Download")
+#define CHECKSUM_ENTRY_ID _T("Checksum")
 #define DEFAULT_EXTENSION _T(".msi")
 
 #endif //PCH_H

@@ -82,8 +82,7 @@ GENUP4WIN bool WriteConfigFile(const std::wstring& strFilePath, const std::wstri
  * @param callback Optional callback function for status/error reporting (default: StatusCallback).
  * @return true if the operation succeeded, false otherwise.
  */
-GENUP4WIN bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, fnCallback callback = StatusCallback);
-
+bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strProductName, std::wstring& strLatestVersion, std::wstring& strDownloadURL, std::wstring& strChecksum, fnCallback ParentCallback);
 /**
  * @brief Checks for software updates by comparing the current version with the latest version from a configuration URL.
  *        If a new version is found, downloads and launches the update, reporting status via callback.

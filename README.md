@@ -12,6 +12,7 @@ Second step is to generate the configuration file, using the `WriteConfigFile` f
     <genUp4win>
         <Version>1.0.0.0</Version>
         <Download>https://www.moga.doctor/freeware/IntelliEditSetup.msi</Download>
+        <Checksum>8fb806e66cd14e0c3204d72fbe04e87b2a2e449c5bdb8f05884e9ad020356ae3</Checksum>
     </genUp4win>
 </xml>
 ```
