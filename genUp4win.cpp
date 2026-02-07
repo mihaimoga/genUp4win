@@ -90,7 +90,7 @@ std::string wstring_to_utf8(const std::wstring& wide_string)
 	return result;
 }
 
-const int MAX_BUFFER = 0x1000; ///< Maximum buffer size for file operations.
+const int MAX_BUFFER = 0x10000; ///< Maximum buffer size for file operations.
 
 /**
  * @brief Calculates the SHA256 checksum of a file.
@@ -98,6 +98,7 @@ const int MAX_BUFFER = 0x1000; ///< Maximum buffer size for file operations.
  * @param strChecksum Output: receives the calculated checksum as a hexadecimal string.
  * @return true if the checksum was calculated successfully, false if the file couldn't be opened.
  */
+#pragma warning(suppress: 6262)
 bool GetChecksumFromFile(const std::wstring strFilePath, std::wstring& strChecksum)
 {
 	SHA256 pSHA256;
@@ -111,6 +112,7 @@ bool GetChecksumFromFile(const std::wstring strFilePath, std::wstring& strChecks
 		// Read the file in chunks and update the SHA256 hash
 		while (!pBinaryFile.eof())
 		{
+			nLength = MAX_BUFFER;
 			pBinaryFile.read(pBuffer, nLength);
 			if (nLength > 0)
 			{
@@ -147,9 +149,9 @@ bool GetChecksumFromURL(const std::wstring strURL, std::wstring& strChecksum)
 		nLength = GetTempFileName(lpszTempPath, L"GUP", 0, lpszFilePath);
 		if (nLength > 0)
 		{
-			// Change the extension from .tmp to .xml
+			// Change the extension from .tmp to .msi (or the default installer extension)
 			CString strFileName = lpszFilePath;
-			strFileName.Replace(_T(".tmp"), _T(".xml"));
+			strFileName.Replace(_T(".tmp"), DEFAULT_EXTENSION);
 
 			// Download the file from the URL
 			if ((hResult = URLDownloadToFile(nullptr, strURL.c_str(), strFileName, 0, nullptr)) == S_OK)
@@ -403,6 +405,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 										{
 											ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage));
 										}
+										::MessageBeep(MB_ICONERROR); // Alert the user with a beep
 										return false; // Checksum mismatch, do not proceed with the update
 									}
 								}
