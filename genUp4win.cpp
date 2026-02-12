@@ -51,24 +51,42 @@ std::wstring utf8_to_wstring(const std::string& string)
 	}
 
 	// Calculate the required buffer size for the wide string
-	const auto size_needed = MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), nullptr, 0);
-	if (size_needed <= 0)
+	// Use MB_ERR_INVALID_CHARS to fail on invalid UTF-8 sequences
+	const int size_needed = MultiByteToWideChar(
+		CP_UTF8,
+		MB_ERR_INVALID_CHARS,
+		string.c_str(),
+		static_cast<int>(string.length()),
+		nullptr,
+		0
+	);
+
+	if (size_needed == 0)
 	{
-		throw std::runtime_error("MultiByteToWideChar() failed: " + std::to_string(size_needed));
+		const DWORD error = GetLastError();
+		throw std::runtime_error("MultiByteToWideChar() failed with error code: " + std::to_string(error));
 	}
 
 	// Allocate buffer and perform the conversion
-	std::wstring result(size_needed, 0);
-	MultiByteToWideChar(CP_UTF8, 0, string.data(), (int)string.size(), result.data(), size_needed);
+	std::wstring result(size_needed, L'\0');
+	const int converted = MultiByteToWideChar(
+		CP_UTF8,
+		MB_ERR_INVALID_CHARS,
+		string.c_str(),
+		static_cast<int>(string.length()),
+		result.data(),
+		size_needed
+	);
+
+	if (converted == 0)
+	{
+		const DWORD error = GetLastError();
+		throw std::runtime_error("MultiByteToWideChar() conversion failed with error code: " + std::to_string(error));
+	}
+
 	return result;
 }
 
-/**
- * @brief Converts a wide string (UTF-16) to a UTF-8 encoded string.
- * @param wide_string The wide string to convert.
- * @return The converted UTF-8 string.
- * @throws std::runtime_error if conversion fails.
- */
 std::string wstring_to_utf8(const std::wstring& wide_string)
 {
 	// Handle empty string case early
@@ -78,15 +96,43 @@ std::string wstring_to_utf8(const std::wstring& wide_string)
 	}
 
 	// Calculate the required buffer size for the UTF-8 string
-	const auto size_needed = WideCharToMultiByte(CP_UTF8, 0, wide_string.data(), (int)wide_string.size(), nullptr, 0, nullptr, nullptr);
-	if (size_needed <= 0)
+	// Use WC_ERR_INVALID_CHARS to fail on invalid UTF-16 sequences
+	const int size_needed = WideCharToMultiByte(
+		CP_UTF8,
+		WC_ERR_INVALID_CHARS,
+		wide_string.c_str(),
+		static_cast<int>(wide_string.length()),
+		nullptr,
+		0,
+		nullptr,
+		nullptr
+	);
+
+	if (size_needed == 0)
 	{
-		throw std::runtime_error("WideCharToMultiByte() failed: " + std::to_string(size_needed));
+		const DWORD error = GetLastError();
+		throw std::runtime_error("WideCharToMultiByte() failed with error code: " + std::to_string(error));
 	}
 
 	// Allocate buffer and perform the conversion
-	std::string result(size_needed, 0);
-	WideCharToMultiByte(CP_UTF8, 0, wide_string.data(), (int)wide_string.size(), result.data(), size_needed, nullptr, nullptr);
+	std::string result(size_needed, '\0');
+	const int converted = WideCharToMultiByte(
+		CP_UTF8,
+		WC_ERR_INVALID_CHARS,
+		wide_string.c_str(),
+		static_cast<int>(wide_string.length()),
+		result.data(),
+		size_needed,
+		nullptr,
+		nullptr
+	);
+
+	if (converted == 0)
+	{
+		const DWORD error = GetLastError();
+		throw std::runtime_error("WideCharToMultiByte() conversion failed with error code: " + std::to_string(error));
+	}
+
 	return result;
 }
 
@@ -98,34 +144,31 @@ const int MAX_BUFFER = 0x10000; ///< Maximum buffer size for file operations.
  * @param strChecksum Output: receives the calculated checksum as a hexadecimal string.
  * @return true if the checksum was calculated successfully, false if the file couldn't be opened.
  */
-#pragma warning(suppress: 6262)
-bool GetChecksumFromFile(const std::wstring strFilePath, std::wstring& strChecksum)
+bool GetChecksumFromFile(const std::wstring& strFilePath, std::wstring& strChecksum)
 {
-	SHA256 pSHA256;
-	int nLength = MAX_BUFFER;
-	char pBuffer[MAX_BUFFER] = { 0, };
+	SHA256 sha256;
 
 	// Open the file in binary mode
-	std::ifstream pBinaryFile(strFilePath.c_str(), std::ifstream::binary);
-	if (pBinaryFile.is_open())
+	std::ifstream file(strFilePath, std::ios::binary);
+	if (!file)
 	{
-		// Read the file in chunks and update the SHA256 hash
-		while (!pBinaryFile.eof())
-		{
-			nLength = MAX_BUFFER;
-			pBinaryFile.read(pBuffer, nLength);
-			if (nLength > 0)
-			{
-				pSHA256.update(reinterpret_cast<const uint8_t*>(pBuffer), static_cast<size_t>(nLength));
-			}
-		}
-		pBinaryFile.close();
-
-		// Convert the digest to a hexadecimal string
-		strChecksum = utf8_to_wstring(SHA256::toString(pSHA256.digest()));
-		return true;
+		return false;
 	}
-	return false;
+
+	// Use a dynamically allocated buffer to avoid stack overflow
+	constexpr size_t bufferSize = MAX_BUFFER;
+	std::vector<char> buffer(bufferSize);
+
+	// Read the file in chunks and update the SHA256 hash
+	while (file.read(buffer.data(), bufferSize) || file.gcount() > 0)
+	{
+		sha256.update(reinterpret_cast<const uint8_t*>(buffer.data()),
+			static_cast<size_t>(file.gcount()));
+	}
+
+	// Convert the digest to a hexadecimal string
+	strChecksum = utf8_to_wstring(SHA256::toString(sha256.digest()));
+	return true;
 }
 
 /**
@@ -419,6 +462,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 									return false; // Failed to calculate checksum, do not proceed with the update
 								}
 							}
+							::MessageBeep(MB_OK); // Alert the user with a beep that the download is complete
 
 							// Launch the downloaded update installer
 							SHELLEXECUTEINFO pShellExecuteInfo;
