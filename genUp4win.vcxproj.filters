@@ -58,6 +58,7 @@
     <None Include="LICENSE" />
     <None Include="README.md" />
     <None Include="CMAKE_BUILD.md" />
+    <None Include="conanfile.py" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="genUp4win.rc">

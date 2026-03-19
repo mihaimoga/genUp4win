@@ -181,6 +181,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="CMAKE_BUILD.md" />
+    <None Include="conanfile.py" />
     <None Include="LICENSE" />
     <None Include="README.md" />
   </ItemGroup>
