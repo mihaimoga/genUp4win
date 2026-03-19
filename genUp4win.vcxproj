@@ -180,11 +180,16 @@
     <ClCompile Include="VersionInfo.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="CMAKE_BUILD.md" />
     <None Include="LICENSE" />
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="genUp4win.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
+    <Text Include="genUp4win\CMakeLists.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

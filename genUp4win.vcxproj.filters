@@ -57,10 +57,15 @@
   <ItemGroup>
     <None Include="LICENSE" />
     <None Include="README.md" />
+    <None Include="CMAKE_BUILD.md" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="genUp4win.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="CMakeLists.txt" />
+    <Text Include="genUp4win\CMakeLists.txt" />
   </ItemGroup>
 </Project>
