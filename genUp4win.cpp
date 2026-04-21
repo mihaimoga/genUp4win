@@ -37,6 +37,210 @@ SOFTWARE. */
 #include "SHA256.h"
 
 /**
+ * @brief IBindStatusCallback implementation for URLDownloadToFile to report download progress.
+ * 
+ * This class implements the COM IBindStatusCallback interface to provide progress notifications
+ * during file downloads using URLDownloadToFile. It tracks download progress and reports
+ * percentage completion to a user-provided callback function.
+ * 
+ * @note This class manages its own lifetime through COM reference counting.
+ *       It will automatically delete itself when the reference count reaches zero.
+ */
+class CDownloadCallback : public IBindStatusCallback
+{
+private:
+	ULONG m_refCount;           ///< COM reference count for object lifetime management
+	fnCallback m_callback;      ///< User callback function for progress notifications
+	ULONGLONG m_totalBytes;     ///< Total size of the file being downloaded in bytes
+	ULONGLONG m_downloadedBytes; ///< Number of bytes downloaded so far
+
+public:
+	/**
+	 * @brief Constructor that initializes the callback with a user-provided function.
+	 * @param callback The callback function to be invoked with progress updates.
+	 */
+	CDownloadCallback(fnCallback callback) 
+		: m_refCount(1), m_callback(callback), m_totalBytes(0), m_downloadedBytes(0)
+	{
+	}
+
+	// ========================================================================================
+	// IUnknown methods - Required for all COM interfaces
+	// ========================================================================================
+
+	/**
+	 * @brief Queries whether this object supports a specific COM interface.
+	 * @param riid The interface identifier (IID) being queried.
+	 * @param ppvObject Output pointer to receive the interface pointer if supported.
+	 * @return S_OK if the interface is supported, E_NOINTERFACE otherwise.
+	 */
+	STDMETHOD(QueryInterface)(REFIID riid, void** ppvObject)
+	{
+		// Check if the requested interface is IUnknown or IBindStatusCallback
+		if (riid == IID_IUnknown || riid == IID_IBindStatusCallback)
+		{
+			*ppvObject = static_cast<IBindStatusCallback*>(this);
+			AddRef(); // Increment reference count for the returned interface
+			return S_OK;
+		}
+		*ppvObject = nullptr;
+		return E_NOINTERFACE; // Interface not supported
+	}
+
+	/**
+	 * @brief Increments the COM reference count for this object.
+	 * @return The new reference count after incrementing.
+	 */
+	STDMETHOD_(ULONG, AddRef)()
+	{
+		// Use thread-safe increment for COM reference counting
+		return InterlockedIncrement(&m_refCount);
+	}
+
+	/**
+	 * @brief Decrements the COM reference count and deletes the object if count reaches zero.
+	 * @return The new reference count after decrementing.
+	 */
+	STDMETHOD_(ULONG, Release)()
+	{
+		// Use thread-safe decrement for COM reference counting
+		ULONG count = InterlockedDecrement(&m_refCount);
+		if (count == 0)
+		{
+			// No more references - delete this object
+			delete this;
+		}
+		return count;
+	}
+
+	// ========================================================================================
+	// IBindStatusCallback methods - Provide download status notifications
+	// ========================================================================================
+
+	/**
+	 * @brief Called when the bind operation starts.
+	 * @param dwReserved Reserved for future use.
+	 * @param pib Pointer to the IBinding interface for the bind operation.
+	 * @return S_OK to continue the operation.
+	 */
+	STDMETHOD(OnStartBinding)(DWORD, IBinding*)
+	{
+		return S_OK; // Continue with the bind operation
+	}
+
+	/**
+	 * @brief Called to get the priority of the bind operation.
+	 * @param pnPriority Pointer to receive the priority value.
+	 * @return E_NOTIMPL as we don't implement custom priority handling.
+	 */
+	STDMETHOD(GetPriority)(LONG*)
+	{
+		return E_NOTIMPL; // We don't implement custom priority
+	}
+
+	/**
+	 * @brief Called when the system is running low on resources.
+	 * @param reserved Reserved for future use.
+	 * @return S_OK to continue the operation.
+	 */
+	STDMETHOD(OnLowResource)(DWORD)
+	{
+		return S_OK; // Continue despite low resources
+	}
+
+	/**
+	 * @brief Called periodically to report download progress.
+	 * 
+	 * This is the main method that tracks and reports download progress. It calculates
+	 * the percentage complete and notifies the user callback function.
+	 * 
+	 * @param ulProgress Number of bytes downloaded so far.
+	 * @param ulProgressMax Total size of the download in bytes.
+	 * @param ulStatusCode Status code indicating the type of progress notification.
+	 * @param szStatusText Optional status text (not used in this implementation).
+	 * @return S_OK to continue the operation.
+	 */
+	STDMETHOD(OnProgress)(ULONG ulProgress, ULONG ulProgressMax, ULONG ulStatusCode, LPCWSTR)
+	{
+		// Only process download progress notifications
+		// BINDSTATUS_DOWNLOADINGDATA: Called periodically during download
+		// BINDSTATUS_ENDDOWNLOADDATA: Called when download completes
+		if (ulStatusCode == BINDSTATUS_DOWNLOADINGDATA || ulStatusCode == BINDSTATUS_ENDDOWNLOADDATA)
+		{
+			// Ensure we have valid progress data to avoid division by zero
+			if (ulProgressMax > 0)
+			{
+				// Update our internal progress tracking
+				m_downloadedBytes = ulProgress;
+				m_totalBytes = ulProgressMax;
+
+				// Calculate percentage complete (0-100)
+				const int percentage = static_cast<int>((ulProgress * 100) / ulProgressMax);
+
+				// Notify the user callback if it's set
+				if (m_callback)
+				{
+					CString strStatusMessage;
+					// Load the localized "Downloading..." message from resources
+					if (strStatusMessage.LoadString(IDS_DOWNLOADING))
+					{
+						// Report progress to the parent application with current percentage
+						m_callback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage), percentage);
+					}
+				}
+			}
+		}
+		return S_OK; // Continue the download
+	}
+
+	/**
+	 * @brief Called when the bind operation stops.
+	 * @param hresult The final result code of the bind operation.
+	 * @param szError Optional error description (not used in this implementation).
+	 * @return S_OK.
+	 */
+	STDMETHOD(OnStopBinding)(HRESULT, LPCWSTR)
+	{
+		return S_OK; // Bind operation has completed
+	}
+
+	/**
+	 * @brief Called to get bind information for the operation.
+	 * @param grfBINDF Pointer to receive bind flags.
+	 * @param pbindinfo Pointer to BINDINFO structure to fill.
+	 * @return S_OK with default bind settings.
+	 */
+	STDMETHOD(GetBindInfo)(DWORD*, BINDINFO*)
+	{
+		return S_OK; // Use default bind settings
+	}
+
+	/**
+	 * @brief Called when downloaded data becomes available.
+	 * @param grfBSCF Flags indicating the type of data available.
+	 * @param dwSize Size of the available data.
+	 * @param pformatetc Pointer to FORMATETC structure describing the data format.
+	 * @param pstgmed Pointer to STGMEDIUM structure containing the data.
+	 * @return S_OK.
+	 */
+	STDMETHOD(OnDataAvailable)(DWORD, DWORD, FORMATETC*, STGMEDIUM*)
+	{
+		return S_OK; // Data is being handled by URLDownloadToFile
+	}
+
+	/**
+	 * @brief Called when a bound object is available.
+	 * @param riid The interface identifier of the object.
+	 * @param punk Pointer to the IUnknown interface of the object.
+	 * @return S_OK.
+	 */
+	STDMETHOD(OnObjectAvailable)(REFIID, IUnknown*)
+	{
+		return S_OK; // Object availability notification received
+	}
+};
+
+/**
  * @brief Converts a UTF-8 encoded string to a wide string (UTF-16).
  * @param string The UTF-8 string to convert.
  * @return The converted wide string.
@@ -266,7 +470,7 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 				// Report COM initialization failure
 				_com_error pError(hr);
 				LPCTSTR lpszErrorMessage = pError.ErrorMessage();
-				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
+				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage, 0);
 				return false;
 			}
 
@@ -288,7 +492,7 @@ bool WriteConfigFile(const std::wstring& strFilePath, const std::wstring& strDow
 			const int nErrorLength = 0x100;
 			TCHAR lpszErrorMessage[nErrorLength] = { 0, };
 			pException.GetErrorMessage(lpszErrorMessage, nErrorLength);
-			ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
+			ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage, 0);
 		}
 	}
 	return retVal;
@@ -329,7 +533,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 			// Report connection status to the user
 			if (strStatusMessage.LoadString(IDS_CONNECTING))
 			{
-				ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage));
+				ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage), 0);
 			}
 
 			// Download the configuration file from the URL
@@ -344,7 +548,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 						// Report COM initialization failure
 						_com_error pError(hr);
 						LPCTSTR lpszErrorMessage = pError.ErrorMessage();
-						ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
+						ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage, 0);
 						return false;
 					}
 
@@ -361,7 +565,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 					const int nErrorLength = 0x100;
 					TCHAR lpszErrorMessage[nErrorLength] = { 0, };
 					pException.GetErrorMessage(lpszErrorMessage, nErrorLength);
-					ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
+					ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage, 0);
 				}
 			}
 			else
@@ -369,7 +573,7 @@ bool ReadConfigFile(const std::wstring& strConfigURL, const std::wstring& strPro
 				// Report download failure
 				_com_error pError(hResult);
 				LPCTSTR lpszErrorMessage = pError.ErrorMessage();
-				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
+				ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage, 0);
 			}
 		}
 	}
@@ -423,14 +627,16 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 						CString strFileName = lpszFilePath;
 						strFileName.Replace(_T(".tmp"), DEFAULT_EXTENSION);
 
-						// Report download status to the user
+						// Report initial download status to the user (0% progress)
 						if (strStatusMessage.LoadString(IDS_DOWNLOADING))
 						{
-							ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage));
+							ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage), 0);
 						}
 
-						// Download the update installer
-						if ((hResult = URLDownloadToFile(nullptr, strDownloadURL.c_str(), strFileName, 0, nullptr)) == S_OK)
+						// Create progress callback handler and download the update installer
+						// CDownloadCallback will receive progress notifications from URLDownloadToFile
+						CDownloadCallback pCallback(ParentCallback);
+						if ((hResult = URLDownloadToFile(nullptr, strDownloadURL.c_str(), strFileName, 0, &pCallback)) == S_OK)
 						{
 							// Verify the downloaded file's checksum if available
 							if (!strChecksum.empty())
@@ -446,7 +652,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 										// Checksum mismatch - report error
 										if (strStatusMessage.LoadString(IDS_CHECKSUM_MISMATCH))
 										{
-											ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage));
+											ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage), 0);
 										}
 										::MessageBeep(MB_ICONERROR); // Alert the user with a beep
 										return false; // Checksum mismatch, do not proceed with the update
@@ -457,7 +663,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 									// Failed to calculate checksum - report error
 									if (strStatusMessage.LoadString(IDS_CHECKSUM_CALCULATION_FAILED))
 									{
-										ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage));
+										ParentCallback(GENUP4WIN_ERROR, std::wstring(strStatusMessage), 0);
 									}
 									return false; // Failed to calculate checksum, do not proceed with the update
 								}
@@ -481,7 +687,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 							// Report success or failure status
 							if (strStatusMessage.LoadString(bLauched ? IDS_SUCCESS : IDS_FAILED))
 							{
-								ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage));
+								ParentCallback(GENUP4WIN_INPROGRESS, std::wstring(strStatusMessage), 0);
 							}
 							retVal = true; // Download was successful
 						}
@@ -490,7 +696,7 @@ bool CheckForUpdates(const std::wstring& strFilePath, const std::wstring& strCon
 							// Report download failure
 							_com_error pError(hResult);
 							LPCTSTR lpszErrorMessage = pError.ErrorMessage();
-							ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage);
+							ParentCallback(GENUP4WIN_ERROR, lpszErrorMessage, 0);
 						}
 					}
 				}

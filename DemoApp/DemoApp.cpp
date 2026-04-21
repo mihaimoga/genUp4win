@@ -108,6 +108,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(lpCmdLine);
 
     // Write a configuration file for the updater (for demonstration)
+    // This creates/updates the local XML configuration file that the updater will use
     CString strFullPath{ GetModuleFileName() };
     WriteConfigFile(strFullPath.GetString(), _T("https://www.moga.doctor/freeware/IntelliEditSetup.msi"));
 
@@ -124,16 +125,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
+    // Load keyboard accelerators for menu shortcuts
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_DEMOAPP));
 
     MSG msg;
 
     // Main message loop:
+    // Retrieves and processes messages until WM_QUIT is received
     while (GetMessage(&msg, nullptr, 0, 0))
     {
+        // Check if message is a keyboard accelerator
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
         {
+            // Translate virtual-key messages into character messages
             TranslateMessage(&msg);
+            // Dispatch message to window procedure
             DispatchMessage(&msg);
         }
     }
@@ -152,16 +158,24 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
+    // Window will redraw when resized horizontally or vertically
     wcex.style          = CS_HREDRAW | CS_VREDRAW;
+    // Set the window procedure callback
     wcex.lpfnWndProc    = WndProc;
+    // No extra bytes for class or window instance
     wcex.cbClsExtra     = 0;
     wcex.cbWndExtra     = 0;
     wcex.hInstance      = hInstance;
+    // Load application icon
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_DEMOAPP));
+    // Set cursor to standard arrow
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
+    // Set background color to system window color
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    // Attach menu resource
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_DEMOAPP);
     wcex.lpszClassName  = szWindowClass;
+    // Load small icon for taskbar
     wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
@@ -175,17 +189,22 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
  */
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // Store instance handle in our global variable
+   // Store instance handle in our global variable
+   hInst = hInstance;
 
+   // Create the main application window with default size and position
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
+   // Check if window creation succeeded
    if (!hWnd)
    {
       return FALSE;
    }
 
+   // Display the window with the specified show command
    ShowWindow(hWnd, nCmdShow);
+   // Send WM_PAINT message to update window content
    UpdateWindow(hWnd);
 
    return TRUE;
@@ -205,26 +224,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         case WM_COMMAND:
         {
+            // Extract menu item ID from wParam
             int wmId = LOWORD(wParam);
             // Parse the menu selections:
             switch (wmId)
             {
                 case ID_FILE_CHECK_FOR_UPDATES:
+                    // Show the update checking dialog
                     DialogBox(hInst, MAKEINTRESOURCE(IDD_CHECK_FOR_UPDATES), hWnd, UpdateCallback);
                     break;
                 case IDM_ABOUT:
+                    // Show the About dialog
                     DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, AboutCallback);
                     break;
                 case IDM_EXIT:
-                        DestroyWindow(hWnd);
-                        break;
-                    default:
-                        return DefWindowProc(hWnd, message, wParam, lParam);
+                    // Close the application
+                    DestroyWindow(hWnd);
+                    break;
+                default:
+                    // Let Windows handle any unprocessed commands
+                    return DefWindowProc(hWnd, message, wParam, lParam);
             }
             break;
        }
         case WM_PAINT:
         {
+            // Handle window painting
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
             UNREFERENCED_PARAMETER(hdc);
@@ -233,6 +258,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             break;
         }
         case WM_DESTROY:
+            // Post a quit message to exit the application
             PostQuitMessage(0);
             break;
         default:
@@ -251,22 +277,26 @@ BOOL CenterWindow(HWND hwndWindow)
     HWND hwndParent;
     RECT rectWindow, rectParent;
 
-    // make the window relative to its parent
+    // Get parent window and center the child window relative to it
     if ((hwndParent = GetParent(hwndWindow)) != NULL)
     {
+        // Get dimensions of both windows
         GetWindowRect(hwndWindow, &rectWindow);
         GetWindowRect(hwndParent, &rectParent);
 
+        // Calculate window dimensions
         int nWidth = rectWindow.right - rectWindow.left;
         int nHeight = rectWindow.bottom - rectWindow.top;
 
+        // Calculate centered position within parent
         int nX = ((rectParent.right - rectParent.left) - nWidth) / 2 + rectParent.left;
         int nY = ((rectParent.bottom - rectParent.top) - nHeight) / 2 + rectParent.top;
 
+        // Get screen dimensions for boundary checking
         int nScreenWidth = GetSystemMetrics(SM_CXSCREEN);
         int nScreenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-        // make sure that the dialog box never moves outside of the screen
+        // Make sure that the dialog box never moves outside of the screen
         if (nX < 0) nX = 0;
         if (nY < 0) nY = 0;
         if (nX + nWidth > nScreenWidth) nX = nScreenWidth - nWidth;
@@ -294,10 +324,12 @@ INT_PTR CALLBACK AboutCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     switch (message)
     {
         case WM_INITDIALOG:
+            // Center the About dialog on screen when initialized
             CenterWindow(hDlg);
             return (INT_PTR)TRUE;
         case WM_COMMAND:
         {
+            // Handle OK or Cancel button clicks
             if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
             {
                 EndDialog(hDlg, LOWORD(wParam));
@@ -309,25 +341,36 @@ INT_PTR CALLBACK AboutCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     return (INT_PTR)FALSE;
 }
 
+// Global dialog handle used by the update callback to update UI
 HWND hwndDialog = nullptr;
 
 /**
  * @brief Callback function for UI updates during update checking.
  * @param status Status code.
  * @param strMessage Status message to display.
+ * @param nProgress Progress percentage (0-100).
  */
-void UI_Callback(int status, const std::wstring& strMessage)
+void UI_Callback(int status, const std::wstring& strMessage, const int& nProgress)
 {
-	UNREFERENCED_PARAMETER(status);
+    UNREFERENCED_PARAMETER(status);
+    // Update the status text in the update dialog
     SetWindowText(GetDlgItem(hwndDialog, IDC_STATUS), strMessage.c_str());
+    // Force immediate update of the status control
     UpdateWindow(GetDlgItem(hwndDialog, IDC_STATUS));
+	// Log progress percentage to debug output for monitoring
+	// This can be extended to update a progress bar control in the UI
+	CString strProgress;
+	strProgress.Format(_T("Progress: %d%%\n"), nProgress);
+	OutputDebugString(strProgress);
 }
 
-bool g_bThreadRunning = false;
-bool g_bNewUpdateFound = false;
+// Global flags for update thread management
+bool g_bThreadRunning = false;    ///< Indicates if the update check thread is running
+bool g_bNewUpdateFound = false;   ///< Set to true if a new update is available
 
 /**
  * @brief Thread procedure for checking for updates.
+ *        Runs in a separate thread to avoid blocking the UI.
  * @param lpParam Unused parameter.
  * @return DWORD exit code.
  */
@@ -336,7 +379,9 @@ DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
     UNREFERENCED_PARAMETER(lpParam);
 
     g_bThreadRunning = true;
+    // Get the current executable path
     CString strFullPath{ GetModuleFileName() };
+    // Check for updates from the remote XML configuration file
     g_bNewUpdateFound = CheckForUpdates(strFullPath.GetString(), _T("https://www.moga.doctor/freeware/genUp4win.xml"), UI_Callback);
     g_bThreadRunning = false;
 
@@ -344,9 +389,10 @@ DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
     // return 0;
 }
 
-DWORD m_nUpdateThreadID = 0;
-HANDLE m_hUpdateThread = 0;
-UINT_PTR m_nTimerID = 0;
+// Update thread management variables
+DWORD m_nUpdateThreadID = 0;   ///< Thread ID of the update checking thread
+HANDLE m_hUpdateThread = 0;    ///< Handle to the update checking thread
+UINT_PTR m_nTimerID = 0;       ///< Timer ID used to poll thread completion
 
 /**
  * @brief Message handler for the "Check for updates" dialog box.
@@ -363,16 +409,24 @@ INT_PTR CALLBACK UpdateCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
     switch (message)
     {
         case WM_INITDIALOG:
-            hwndDialog = hDlg; // used in UI_Callback
+            // Store dialog handle for use in UI_Callback
+            hwndDialog = hDlg;
+            // Center the update dialog on screen
             CenterWindow(hDlg);
+            // Optional: enable progress bar marquee animation
             // SendMessage(GetDlgItem(hDlg, IDC_PROGRESS), (UINT)PBM_SETMARQUEE, (WPARAM)TRUE, (LPARAM)30);
+            // Create a background thread to check for updates
             m_hUpdateThread = ::CreateThread(nullptr, 0, (LPTHREAD_START_ROUTINE)UpdateThreadProc, hDlg, 0, &m_nUpdateThreadID);
+            // Set up a timer to poll thread completion every 100ms
             m_nTimerID = SetTimer(hDlg, 0x1234, 100, nullptr);
             return (INT_PTR)TRUE;
         case WM_TIMER:
+            // Check if the update thread has completed
             if (!g_bThreadRunning)
             {
+                // Close the update dialog
                 EndDialog(hDlg, IDCANCEL);
+                // If a new update was found, exit the application (to allow update installation)
                 if (g_bNewUpdateFound)
                 {
                     PostQuitMessage(0);
@@ -381,6 +435,7 @@ INT_PTR CALLBACK UpdateCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             return 0;
         case WM_COMMAND:
         {
+            // Handle manual dialog closure via OK or Cancel buttons
             if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
             {
                 EndDialog(hDlg, LOWORD(wParam));

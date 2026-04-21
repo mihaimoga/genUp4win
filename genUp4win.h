@@ -45,15 +45,17 @@ typedef enum {
  * @brief Default status callback function. Outputs the status message to the debug output.
  * @param status Status code (see GENUP4WIN_STATUS).
  * @param strMessage Status message.
+ * @param nProgress Progress percentage (0-100).
  */
-void StatusCallback(int status, const std::wstring& strMessage) { UNREFERENCED_PARAMETER(status); OutputDebugString(strMessage.c_str()); };
+void StatusCallback(int status, const std::wstring& strMessage, const int& nProgress) { UNREFERENCED_PARAMETER(status); OutputDebugString(strMessage.c_str()); UNREFERENCED_PARAMETER(nProgress); };
 
 /**
  * @brief Callback function type for reporting status and messages.
  * @param status Status code (see GENUP4WIN_STATUS).
  * @param strMessage Status message.
+ * @param nProgress Progress percentage (0-100) for download operations.
  */
-typedef std::function<void(int, const std::wstring& strMessage)> fnCallback;
+typedef std::function<void(int, const std::wstring& strMessage, const int& nProgress)> fnCallback;
 
 /**
  * @brief Generates the full path to the configuration XML file for the application.
