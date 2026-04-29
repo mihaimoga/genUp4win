@@ -6,7 +6,7 @@ import os
 
 class GenericUpdaterConan(ConanFile):
     name = "genericupdater"
-    version = "1.0.0"
+    version = "3.03"
     license = "MIT"
     author = "Stefan-Mihai MOGA"
     url = "https://github.com/mihaimoga/genUp4win"
