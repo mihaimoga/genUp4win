@@ -180,6 +180,7 @@
     <ClCompile Include="VersionInfo.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="AGENTS.md" />
     <None Include="CMAKE_BUILD.md" />
     <None Include="conanfile.py" />
     <None Include="LICENSE" />
