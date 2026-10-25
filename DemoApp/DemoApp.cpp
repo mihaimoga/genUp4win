@@ -70,12 +70,15 @@ CString GetModuleFileName(_Inout_opt_ DWORD* pdwLastError = nullptr)
 {
     CString strModuleFileName;
     DWORD dwSize{ _MAX_PATH };
+    // Retry with a larger buffer until the full path fits
     while (true)
     {
+        // Allocate a writable buffer of dwSize characters
         TCHAR* pszModuleFileName{ strModuleFileName.GetBuffer(dwSize) };
         const DWORD dwResult{ ::GetModuleFileName(nullptr, pszModuleFileName, dwSize) };
         if (dwResult == 0)
         {
+            // API failure: report the error code to the caller
             if (pdwLastError != nullptr)
                 *pdwLastError = GetLastError();
             strModuleFileName.ReleaseBuffer(0);
@@ -83,6 +86,7 @@ CString GetModuleFileName(_Inout_opt_ DWORD* pdwLastError = nullptr)
         }
         else if (dwResult < dwSize)
         {
+            // Success: the path fit in the buffer (dwResult excludes the null terminator)
             if (pdwLastError != nullptr)
                 *pdwLastError = ERROR_SUCCESS;
             strModuleFileName.ReleaseBuffer(dwResult);
@@ -90,6 +94,7 @@ CString GetModuleFileName(_Inout_opt_ DWORD* pdwLastError = nullptr)
         }
         else if (dwResult == dwSize)
         {
+            // Path was truncated: discard the buffer and double its size
             strModuleFileName.ReleaseBuffer(0);
             dwSize *= 2;
         }
@@ -378,11 +383,13 @@ DWORD WINAPI UpdateThreadProc(LPVOID lpParam)
 {
     UNREFERENCED_PARAMETER(lpParam);
 
+    // Flag the thread as running so the dialog timer keeps polling
     g_bThreadRunning = true;
     // Get the current executable path
     CString strFullPath{ GetModuleFileName() };
     // Check for updates from the remote XML configuration file
     g_bNewUpdateFound = CheckForUpdates(strFullPath.GetString(), _T("https://www.moga.doctor/freeware/genUp4win.xml"), UI_Callback);
+    // Signal completion; g_bNewUpdateFound holds the result of the check
     g_bThreadRunning = false;
 
     ::ExitThread(0);
@@ -424,13 +431,14 @@ INT_PTR CALLBACK UpdateCallback(HWND hDlg, UINT message, WPARAM wParam, LPARAM l
             // Check if the update thread has completed
             if (!g_bThreadRunning)
             {
-                // Close the update dialog
-                EndDialog(hDlg, IDCANCEL);
                 // If a new update was found, exit the application (to allow update installation)
                 if (g_bNewUpdateFound)
                 {
+                    // Close the update dialog
+                    EndDialog(hDlg, IDCANCEL);
                     PostQuitMessage(0);
                 }
+                // Otherwise no update is available: the dialog stays open until the user closes it
             }
             return 0;
         case WM_COMMAND:
